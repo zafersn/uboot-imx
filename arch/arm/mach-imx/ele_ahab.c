@@ -7,7 +7,7 @@
 #include <command.h>
 #include <errno.h>
 #include <asm/io.h>
-#include <asm/mach-imx/s400_api.h>
+#include <asm/mach-imx/ele_api.h>
 #include <asm/mach-imx/sys_proto.h>
 #include <asm/arch-imx/cpu.h>
 #include <asm/arch/sys_proto.h>
@@ -260,14 +260,14 @@ int ahab_auth_cntr_hdr(struct container_hdr *container, u16 length)
 {
 	int err;
 	u32 resp;
+
 	memcpy((void *)IMG_CONTAINER_BASE, (const void *)container,
 	       ALIGN(length, CONFIG_SYS_CACHELINE_SIZE));
 
 	flush_dcache_range(IMG_CONTAINER_BASE,
-		IMG_CONTAINER_BASE + ALIGN(length, CONFIG_SYS_CACHELINE_SIZE) - 1);
+			   IMG_CONTAINER_BASE + ALIGN(length, CONFIG_SYS_CACHELINE_SIZE) - 1);
 
-	err = ahab_auth_oem_ctnr(IMG_CONTAINER_BASE,
-				   &resp);
+	err = ahab_auth_oem_ctnr(IMG_CONTAINER_BASE, &resp);
 	if (err) {
 		printf("Authenticate container hdr failed, return %d, resp 0x%x\n",
 		       err, resp);
@@ -373,7 +373,7 @@ int authenticate_os_container(ulong addr)
 					    i * sizeof(struct boot_img_t));
 
 		debug("img %d, dst 0x%x, src 0x%lx, size 0x%x\n",
-		      i, (uint32_t) img->dst, img->offset + addr, img->size);
+		      i, (uint32_t)img->dst, img->offset + addr, img->size);
 
 		memcpy((void *)img->dst, (const void *)(img->offset + addr),
 		       img->size);
@@ -413,6 +413,54 @@ static int do_authenticate(struct cmd_tbl *cmdtp, int flag, int argc,
 	return CMD_RET_SUCCESS;
 }
 
+#ifdef CONFIG_IMX95
+#define FSB_LC_OFFSET 0x414
+#define LC_OEM_OPEN 0x10
+static void display_life_cycle(u32 lc)
+{
+	printf("Lifecycle: 0x%08X, ", lc);
+	switch (lc) {
+	case 0x1:
+		printf("BLANK\n\n");
+		break;
+	case 0x2:
+		printf("FAB Default\n\n");
+		break;
+	case 0x4:
+		printf("FAB\n\n");
+		break;
+	case 0x8:
+		printf("NXP Provisioned\n\n");
+		break;
+	case 0x10:
+		printf("OEM Open\n\n");
+		break;
+	case 0x20:
+		printf("OEM secure world closed\n\n");
+		break;
+	case 0x40:
+		printf("OEM closed\n\n");
+		break;
+	case 0x80:
+		printf("OEM Locked\n\n");
+		break;
+	case 0x100:
+		printf("Field Return OEM\n\n");
+		break;
+	case 0x200:
+		printf("Field Return NXP\n\n");
+		break;
+	case 0x400:
+		printf("BRICKED\n\n");
+		break;
+	default:
+		printf("Unknown\n\n");
+		break;
+	}
+}
+#else
+#define FSB_LC_OFFSET 0x41c
+#define LC_OEM_OPEN 0x8
 static void display_life_cycle(u32 lc)
 {
 	printf("Lifecycle: 0x%08X, ", lc);
@@ -449,6 +497,7 @@ static void display_life_cycle(u32 lc)
 		break;
 	}
 }
+#endif
 
 static int confirm_close(void)
 {
@@ -476,10 +525,10 @@ static int do_ahab_close(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (!confirm_close())
 		return -EACCES;
 
-	lc = readl(FSB_BASE_ADDR + 0x41c);
+	lc = readl(FSB_BASE_ADDR + FSB_LC_OFFSET);
 	lc &= 0x3ff;
 
-	if (lc != 0x8) {
+	if (lc != LC_OEM_OPEN) {
 		puts("Current lifecycle is NOT OEM open, can't move to OEM closed\n");
 		display_life_cycle(lc);
 		return -EPERM;
@@ -508,19 +557,16 @@ int ahab_dump(void)
 			return -EIO;
 		}
 
-		if (ret == 1) {
+		if (ret == 1)
 			break;
-		} else {
-			for (i = 0; i < ret; i++)
-				printf("0x%x\n", buffer[i]);
-		}
+		for (i = 0; i < ret; i++)
+			printf("0x%x\n", buffer[i]);
 	} while (ret >= 21);
 
 	return 0;
 }
 
-static int do_ahab_dump(struct cmd_tbl *cmdtp, int flag, int argc,
-			 char *const argv[])
+static int do_ahab_dump(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	return ahab_dump();
 }
@@ -538,15 +584,14 @@ static void display_event(u32 event)
 		event & 0xFF, ARRAY_SIZE(ele_status))]);
 }
 
-static int do_ahab_status(struct cmd_tbl *cmdtp, int flag, int argc,
-			  char *const argv[])
+static int do_ahab_status(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	u32 lc, i;
 	u32 events[AHAB_MAX_EVENTS];
 	u32 cnt = AHAB_MAX_EVENTS;
 	int ret;
 
-	lc = readl(FSB_BASE_ADDR + 0x41c);
+	lc = readl(FSB_BASE_ADDR + FSB_LC_OFFSET);
 	lc &= 0x3ff;
 
 	display_life_cycle(lc);
@@ -600,6 +645,60 @@ static int do_sec_fuse_prog(struct cmd_tbl *cmdtp, int flag, int argc,
 	return CMD_RET_SUCCESS;
 }
 
+static int do_ahab_return_lifecycle(struct cmd_tbl *cmdtp, int flag, int argc,
+			   char *const argv[])
+{
+	ulong addr;
+	u32 header, response;
+
+	if (argc < 2)
+		return CMD_RET_USAGE;
+
+	addr = simple_strtoul(argv[1], NULL, 16);
+	header = *(u32 *)addr;
+
+	if ((header & 0xff0000ff) != 0x89000000) {
+		printf("Wrong Signed message block format, header 0x%x\n", header);
+		return CMD_RET_FAILURE;
+	}
+
+	header = (header & 0xffff00) >> 8;
+
+	printf("Signed Message block at 0x%lx, size 0x%x\n", addr, header);
+	flush_dcache_range(addr, addr + header - 1);
+
+	if (ahab_return_lifecycle_update(addr, &response)) {
+		printf("Return lifecycle failed, response 0x%x\n", response);
+		return CMD_RET_FAILURE;
+	}
+
+	printf("Return lifecycle completed, response 0x%x\n", response);
+
+	return CMD_RET_SUCCESS;
+}
+
+static int do_ahab_commit(struct cmd_tbl *cmdtp, int flag, int argc,
+			  char *const argv[])
+{
+	u32 index;
+	u32 resp;
+	u32 info_type;
+
+	if (argc < 2)
+		return CMD_RET_USAGE;
+
+	index = simple_strtoul(argv[1], NULL, 16);
+	printf("Commit index is 0x%x\n", index);
+
+	if (ahab_commit(index, &resp, &info_type)) {
+		printf("Error in AHAB commit\n");
+		return -EIO;
+	}
+
+	printf("Ahab commit succeeded. Information type is 0x%x\n", info_type);
+
+	return 0;
+}
 
 U_BOOT_CMD(auth_cntr, CONFIG_SYS_MAXARGS, 1, do_authenticate,
 	   "autenticate OS container via AHAB",
@@ -626,4 +725,16 @@ U_BOOT_CMD(ahab_sec_fuse_prog, CONFIG_SYS_MAXARGS, 1, do_sec_fuse_prog,
 	   "Program secure fuse via signed message block",
 	   "addr\n"
 	   "addr - Signed message block for secure fuse\n"
+);
+
+U_BOOT_CMD(ahab_return_lifecycle, CONFIG_SYS_MAXARGS, 1, do_ahab_return_lifecycle,
+	   "Return lifecycle to OEM field return via signed message block",
+	   "addr\n"
+	   "addr - Return lifecycle message block signed by OEM SRK\n"
+);
+
+U_BOOT_CMD(ahab_commit, CONFIG_SYS_MAXARGS, 1, do_ahab_commit,
+	   "commit into the fuses any new SRK revocation and FW version information\n"
+	   "that have been found into the NXP (ELE FW) and OEM containers",
+	   ""
 );

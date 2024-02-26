@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2018 NXP
+ * Copyright 2023 Avnet
  */
 
 #include <common.h>
@@ -25,7 +25,6 @@
 #include <spl.h>
 #include <linux/bitops.h>
 #include <power/pmic.h>
-#include <power/pfuze100_pmic.h>
 #include "../../freescale/common/tcpc.h"
 #include "../../freescale/common/pfuze.h"
 #include <usb.h>
@@ -98,6 +97,11 @@ static int setup_fec(void)
 
 int board_phy_config(struct phy_device *phydev)
 {
+#ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
+	if (phydev->drv->uid == 0x1cc916) /*RTL8211F*/
+		env_set("board_name", "WEVK");
+#endif
+
 	if (phydev->drv->config)
 		phydev->drv->config(phydev);
 
@@ -237,6 +241,7 @@ int board_usb_init(int index, enum usb_init_type init)
 		ret = tcpc_setup_ufp_mode(&port);
 #endif
 		dwc3_nxp_usb_phy_init(&dwc3_device_data);
+		ret = sizeof(dwc3_device_data);
 		return dwc3_uboot_init(&dwc3_device_data);
 	} else if (index == 0 && init == USB_INIT_HOST) {
 #ifdef CONFIG_USB_TCPC
@@ -264,22 +269,8 @@ int board_usb_cleanup(int index, enum usb_init_type init)
 }
 #endif
 
-
-#define POWER_LED_PAD IMX_GPIO_NR(1, 8)
-static iomux_v3_cfg_t const leds_pads[] = {
-	IMX8MQ_PAD_GPIO1_IO08__GPIO1_IO8 | MUX_PAD_CTRL(NO_PAD_CTRL),
-};
-static void led_on(void)
-{
-	imx_iomux_v3_setup_multiple_pads(leds_pads, ARRAY_SIZE(leds_pads));
-
-	gpio_request(POWER_LED_PAD, "sys_led");
-	gpio_direction_output(POWER_LED_PAD, 1);
-}
-
 int board_init(void)
 {
-	led_on();
 #ifdef CONFIG_FSL_QSPI
 	board_qspi_init();
 #endif

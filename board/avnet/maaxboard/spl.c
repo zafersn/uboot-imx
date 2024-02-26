@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2018, 2021 NXP
+ * Copyright 2023, Avnet
  *
  */
 
@@ -26,8 +26,8 @@
 #include <mmc.h>
 #include <linux/delay.h>
 #include <power/pmic.h>
-#include <power/bd71837.h>
 #include <spl.h>
+#include <power/bd71837.h>
 #include <asm/arch/imx8mq_sec_def.h>
 #include <asm/arch/imx8m_csu.h>
 #include <asm/arch/imx8m_rdc.h>
@@ -39,10 +39,7 @@ extern struct dram_timing_info dram_timing;
 static void spl_dram_init(void)
 {
 	/* ddr init */
-	if (soc_rev() >= CHIP_REV_2_1)
-		ddr_init(&dram_timing);
-	else
-		ddr_init(&dram_timing);
+	ddr_init(&dram_timing);
 }
 
 #define I2C_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_HYS | PAD_CTL_PUE)
@@ -124,7 +121,7 @@ int board_mmc_init(struct bd_info *bis)
 	 * mmc0                    USDHC1
 	 * mmc1                    USDHC2
 	 */
-	for (i = 0; i < CONFIG_SYS_FSL_USDHC_NUM; i++) {
+	for (i = 0; i < CFG_SYS_FSL_USDHC_NUM; i++) {
 		switch (i) {
 		case 0:
 			init_clk_usdhc(0);
@@ -165,6 +162,7 @@ int power_init_board(void)
 {
 	struct pmic *p;
 	int ret;
+	unsigned int reg;
 
 	ret = power_bd71837_init(I2C_PMIC);
 	if (ret)
@@ -175,7 +173,7 @@ int power_init_board(void)
 	if (ret)
 		return -ENODEV;
 
-	printf("set buck8 to 1.2v for DDR4\n");
+    printf("set buck8 to 1.2v for DDR4\n");
 	/* unlock the PMIC regs */
 	pmic_reg_write(p, BD718XX_REGLOCK, 0x1);
 
@@ -194,13 +192,14 @@ int power_init_board(void)
 
 void spl_board_init(void)
 {
-	if (IS_ENABLED(CONFIG_FSL_CAAM)) {
+    if (IS_ENABLED(CONFIG_FSL_CAAM)) {
 		if (sec_init())
 			printf("\nsec_init failed!\n");
 	}
 
 #ifndef CONFIG_SPL_USB_SDP_SUPPORT
 	/* Serial download mode */
+    printf("Serial download mode");
 	if (is_usb_boot()) {
 		puts("Back to ROM, SDP\n");
 		restore_boot_params();
@@ -210,6 +209,7 @@ void spl_board_init(void)
 	init_usb_clk();
 
 	puts("Normal Boot\n");
+
 }
 
 #ifdef CONFIG_SPL_LOAD_FIT
