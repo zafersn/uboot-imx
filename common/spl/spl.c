@@ -747,11 +747,11 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 	};
 	struct spl_image_info spl_image;
 	int ret;
-
+	printf("spl.c: board_init_r 1\n");
 	debug(">>" SPL_TPL_PROMPT "board_init_r()\n");
 
 	spl_set_bd();
-
+	printf("spl.c: board_init_r 2\n");
 #if defined(CONFIG_SYS_SPL_MALLOC)
 	mem_malloc_init(SYS_SPL_MALLOC_START, CONFIG_SYS_SPL_MALLOC_SIZE);
 	gd->flags |= GD_FLG_FULL_MALLOC_INIT;
@@ -785,18 +785,22 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 			hang();
 		}
 	}
+	printf("spl.c: board_init_r 3 --\n");
 
 #if CONFIG_IS_ENABLED(BOARD_INIT)
 	spl_board_init();
 #endif
+	printf("spl.c: board_init_r 3-1 --\n");
 
 #if defined(CONFIG_SPL_WATCHDOG) && CONFIG_IS_ENABLED(WDT)
 	initr_watchdog();
 #endif
+	printf("spl.c: board_init_r 3-2 --\n");
 
 	if (IS_ENABLED(CONFIG_SPL_OS_BOOT) || CONFIG_IS_ENABLED(HANDOFF) ||
 	    IS_ENABLED(CONFIG_SPL_ATF))
 		dram_init_banksize();
+	printf("spl.c: board_init_r 3-3 --\n");
 
 	bootcount_inc();
 
@@ -807,6 +811,7 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 		dm_get_mem(&mem);
 		dm_dump_mem(&mem);
 	}
+	printf("spl.c: board_init_r 3-4 --\n");
 
 	memset(&spl_image, '\0', sizeof(spl_image));
 #ifdef CONFIG_SYS_SPL_ARGS_ADDR
@@ -814,9 +819,11 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 #endif
 	spl_image.boot_device = BOOT_DEVICE_NONE;
 	board_boot_order(spl_boot_list);
+	printf("spl.c: board_init_r 3-5 --\n");
 
 	ret = boot_from_devices(&spl_image, spl_boot_list,
 				ARRAY_SIZE(spl_boot_list));
+	printf("spl.c: board_init_r 3-6 --\n");
 	if (ret) {
 		if (CONFIG_IS_ENABLED(SHOW_ERRORS) &&
 		    CONFIG_IS_ENABLED(LIBCOMMON_SUPPORT))
@@ -826,6 +833,7 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 			puts(SPL_TPL_PROMPT "failed to boot from all boot devices\n");
 		hang();
 	}
+	printf("spl.c: board_init_r 4\n");
 
 	spl_perform_fixups(&spl_image);
 	if (CONFIG_IS_ENABLED(HANDOFF)) {
@@ -840,7 +848,7 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 			printf("Warning: Failed to finish bloblist (ret=%d)\n",
 			       ret);
 	}
-
+	printf("spl.c: board_init_r 5 %d\n", spl_image.os);
 	switch (spl_image.os) {
 	case IH_OS_U_BOOT:
 		debug("Jumping to %s...\n", spl_phase_name(spl_next_phase()));
@@ -877,6 +885,7 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 	default:
 		debug("Unsupported OS image.. Jumping nevertheless..\n");
 	}
+	printf("spl.c: board_init_r 6\n");
 #if CONFIG_VAL(SYS_MALLOC_F_LEN) && !defined(CONFIG_SYS_SPL_MALLOC_SIZE)
 	debug("SPL malloc() used 0x%lx bytes (%ld KB)\n", gd->malloc_ptr,
 	      gd->malloc_ptr / 1024);
@@ -888,9 +897,11 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 	if (ret)
 		debug("Failed to stash bootstage: err=%d\n", ret);
 #endif
+	printf("spl.c: board_init_r 7\n");
 
 	spl_board_prepare_for_boot();
 	jump_to_image_no_args(&spl_image);
+	printf("spl.c: board_init_r 8\n");
 }
 
 /*

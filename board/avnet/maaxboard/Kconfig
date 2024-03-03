@@ -13,4 +13,3 @@ config IMX_CONFIG
 	default "arch/arm/mach-imx/imx8m/imximage.cfg"
 
 endif
-

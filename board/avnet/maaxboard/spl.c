@@ -162,7 +162,7 @@ int power_init_board(void)
 {
 	struct pmic *p;
 	int ret;
-	unsigned int reg;
+	// unsigned int reg;
 
 	ret = power_bd71837_init(I2C_PMIC);
 	if (ret)
@@ -192,11 +192,12 @@ int power_init_board(void)
 
 void spl_board_init(void)
 {
+	printf("SPC-maaxbrd: spl_board_init 1\n");
     if (IS_ENABLED(CONFIG_FSL_CAAM)) {
 		if (sec_init())
 			printf("\nsec_init failed!\n");
 	}
-
+	printf("SPC-maaxbrd: spl_board_init 2\n");
 #ifndef CONFIG_SPL_USB_SDP_SUPPORT
 	/* Serial download mode */
     printf("Serial download mode");
@@ -205,11 +206,11 @@ void spl_board_init(void)
 		restore_boot_params();
 	}
 #endif
-
+	printf("SPC-maaxbrd: spl_board_init 3\n");
 	init_usb_clk();
-
+	printf("SPC-maaxbrd: spl_board_init 4\n");
 	puts("Normal Boot\n");
-
+	printf("SPC-maaxbrd: spl_board_init 5\n");
 }
 
 #ifdef CONFIG_SPL_LOAD_FIT
@@ -268,11 +269,13 @@ void board_init_f(ulong dummy)
 	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info1);
 
 	power_init_board();
-
+	printf("SPC-maaxbrd: spl_dram_init 1\n");
 	/* DDR initialization */
 	spl_dram_init();
 
+	printf("SPC-maaxbrd: board_init_r 1\n");
 	board_init_r(NULL, 0);
+	printf("SPC-maaxbrd: board_init_r 2\n");
 }
 
 #ifdef CONFIG_ANDROID_SUPPORT

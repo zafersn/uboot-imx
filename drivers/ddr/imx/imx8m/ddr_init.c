@@ -471,7 +471,7 @@ int ddr_init(struct dram_timing_info *dram_timing)
 
 	/* save the dram timing config into memory */
 	dram_config_save(dram_timing, CONFIG_SAVED_DRAM_TIMING_BASE);
-
+	printf("DDRINFO: ddr_init() done\n");
 	return 0;
 }
 
