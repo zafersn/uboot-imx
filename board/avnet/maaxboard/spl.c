@@ -20,6 +20,7 @@
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/mach-imx/gpio.h>
 #include <asm/mach-imx/mxc_i2c.h>
+#include <asm/sections.h>
 #include <fsl_esdhc_imx.h>
 #include <fsl_sec.h>
 #include <mmc.h>
@@ -161,7 +162,6 @@ int power_init_board(void)
 {
 	struct pmic *p;
 	int ret;
-	unsigned int reg;
 
 	ret = power_bd71837_init(I2C_PMIC);
 	if (ret)
